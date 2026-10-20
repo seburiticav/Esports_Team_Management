@@ -6,6 +6,7 @@
 #include <QNetworkAccessManager>
 #include <QStringList>
 #include <QTableWidget>
+#include "src/data_structures.h"
 #include "src/esports_core.h"
 class QLabel;
 class QPushButton;
@@ -55,6 +56,7 @@ private:
     void clearRiotApiKey();
     bool ensureRiotApiKey();
     void addLolAccount();
+    bool rebuildRoleUndoStack(QString* errorMessage);
     void processNextLolAccountUpdate();
     void finishLolAccountUpdate(int index, const QString& error = {});
     void refreshPlayersTable();
@@ -94,7 +96,9 @@ private:
     QPushButton* downloadDataButton = nullptr;
     QNetworkAccessManager networkManager;
     QVector<CsvTableView> csvTableViews;
-    QVector<int> lolAccountUpdateQueue;
+    Queue<int> lolAccountUpdateQueue;
+    Stack<int> roleUndoStack;
+    bool roleUndoHistoryValid = true;
     QByteArray riotApiKey;
     QStringList lolAccountUpdateErrors;
     int lolAccountUpdateTotal = 0;
@@ -115,7 +119,7 @@ private:
     int championImageProcessed = 0;
     int championImageSkipped = 0;
     int championImageDownloaded = 0;
-    QVector<int> riotStatsQueue;
+    Queue<int> riotStatsQueue;
     QString riotStatsPuuid;
     QStringList riotStatsMatchIds;
     QStringList riotStatsCurrentErrors;

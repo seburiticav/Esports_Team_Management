@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.16)
 
 project(Proyecto_EDD VERSION 0.1 LANGUAGES CXX)
 
+include(CTest)
+
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -17,6 +19,7 @@ set(PROJECT_SOURCES
         mainwindow.cpp
         mainwindow.h
         mainwindow.ui
+        src/data_structures.h
         app_resources.qrc
 )
 
@@ -79,4 +82,12 @@ install(TARGETS Proyecto_EDD
 
 if(QT_VERSION_MAJOR EQUAL 6)
     qt_finalize_executable(Proyecto_EDD)
+endif()
+
+if(BUILD_TESTING)
+    add_executable(data_structures_tests tests/data_structures_tests.cpp)
+    target_include_directories(data_structures_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    add_test(NAME data_structures_tests COMMAND data_structures_tests)
 endif()
