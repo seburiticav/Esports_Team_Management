@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 520" width="1024" height="1024">
+  <defs>
+    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5EEAD4"/>
+      <stop offset="1" stop-color="#6366F1"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFE29A"/>
+      <stop offset="1" stop-color="#FF8A5B"/>
+    </linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14182B"/>
+      <stop offset="1" stop-color="#0A0C18"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="520" height="520" rx="110" fill="url(#bg)"/>
+
+  <!-- E + S fusionadas: comparten el trazo central -->
+  <g fill="none" stroke="url(#g1)" stroke-width="38" stroke-linejoin="miter" stroke-linecap="butt">
+    <!-- E -->
+    <path d="M250 150 H135 V370 H250"/>
+    <path d="M135 260 H250"/>
+    <!-- S (pegada a la E, comparte el brazo central) -->
+    <path d="M385 150 H250 V260 H385 V370 H250"/>
+  </g>
+
+  <!-- M que atraviesa ambas letras (con contorno para separarla) -->
+  <g fill="none" stroke-linejoin="miter" stroke-linecap="butt">
+    <path d="M95 420 V100 L260 290 L425 100 V420" stroke="#0A0C18" stroke-width="44"/>
+    <path d="M95 420 V100 L260 290 L425 100 V420" stroke="url(#g2)" stroke-width="22"/>
+  </g>
+</svg>

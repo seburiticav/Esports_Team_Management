@@ -1,0 +1,3 @@
+change_id,player_id,old_role,new_role,change_date,action,reference_change_id
+1,1105231952,TOP,JG,2026-10-19T22:09:00,CAMBIO,
+2,1105231952,JG,TOP,2026-10-19T22:09:03,DESHACER,1
