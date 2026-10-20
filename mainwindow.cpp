@@ -425,6 +425,10 @@ MainWindow::MainWindow(QWidget *parent)
             : QString("%1 cuentas cargadas desde CSV.").arg(lolUsers.size()));
 
     addCsvDataTabs();
+    QString undoStackError;
+    if (!rebuildRoleUndoStack(&undoStackError)) {
+        QMessageBox::warning(this, "Auditoría de roles inválida", undoStackError);
+    }
     addSummaryReportTabs();
 }
 
@@ -439,7 +443,8 @@ void MainWindow::updateSelectedLolAccount()
 
     if (!ensureRiotApiKey()) return;
 
-    lolAccountUpdateQueue = {index};
+    lolAccountUpdateQueue.clear();
+    lolAccountUpdateQueue.enqueue(index);
     lolAccountUpdateTotal = 1;
     lolAccountUpdateSuccesses = 0;
     lolAccountUpdateErrors.clear();
@@ -470,7 +475,7 @@ void MainWindow::updateAllLolAccounts()
 
     lolAccountUpdateQueue.clear();
     for (int index = 0; index < core.getLolUsers().size(); ++index) {
-        lolAccountUpdateQueue.append(index);
+        lolAccountUpdateQueue.enqueue(index);
     }
     lolAccountUpdateTotal = lolAccountUpdateQueue.size();
     lolAccountUpdateSuccesses = 0;
@@ -545,7 +550,7 @@ bool MainWindow::ensureRiotApiKey()
 
 void MainWindow::processNextLolAccountUpdate()
 {
-    if (lolAccountUpdateQueue.isEmpty()) {
+    if (lolAccountUpdateQueue.empty()) {
         const int failed = lolAccountUpdateTotal - lolAccountUpdateSuccesses;
         ui->updateLolAccountButton->setEnabled(true);
         ui->updateAllLolAccountsButton->setEnabled(true);
@@ -566,7 +571,7 @@ void MainWindow::processNextLolAccountUpdate()
         return;
     }
 
-    const int index = lolAccountUpdateQueue.takeFirst();
+    const int index = lolAccountUpdateQueue.dequeue();
     const LoLUser selectedUser = core.getLolUsers()[index];
     const QString riotId = QString::fromStdString(selectedUser.riotId).trimmed();
     const QString tagline = QString::fromStdString(selectedUser.tagline).trimmed();
@@ -1285,8 +1290,21 @@ bool MainWindow::savePlayerRoleChange(int playerIndex, const QString& newRole,
                                       const QString& action, int referenceChangeId,
                                       QString* errorMessage)
 {
+    if (!roleUndoHistoryValid) {
+        if (errorMessage) {
+            *errorMessage = "La pila de deshacer no se pudo reconstruir desde la auditoría.";
+        }
+        return false;
+    }
     if (playerIndex < 0 || playerIndex >= core.getPlayers().size()) {
         if (errorMessage) *errorMessage = "El jugador seleccionado ya no existe.";
+        return false;
+    }
+    if (action == "DESHACER"
+        && (roleUndoStack.empty() || roleUndoStack.top() != referenceChangeId)) {
+        if (errorMessage) {
+            *errorMessage = "El cambio indicado no es el último cambio pendiente de deshacer.";
+        }
         return false;
     }
     CsvTableView* changesView = findCsvTable("state_player_changes.csv");
@@ -1389,8 +1407,70 @@ bool MainWindow::savePlayerRoleChange(int playerIndex, const QString& newRole,
         }
         return false;
     }
+    if (action == "CAMBIO") {
+        roleUndoStack.push(nextChangeId);
+    } else if (action == "DESHACER") {
+        roleUndoStack.pop();
+    }
     if (activeContractRow >= 0) refreshCsvTable(*contractsView);
     refreshSummaryReports();
+    return true;
+}
+
+bool MainWindow::rebuildRoleUndoStack(QString* errorMessage)
+{
+    roleUndoStack.clear();
+    roleUndoHistoryValid = false;
+    CsvTableView* changesView = findCsvTable("state_player_changes.csv");
+    if (!changesView) {
+        if (errorMessage) *errorMessage = "No se encontró la tabla de auditoría de roles.";
+        return false;
+    }
+
+    CsvTableData changes;
+    if (!core.loadCsvTable(changesView->filePath, changesView->csvHeaders,
+                           &changes, errorMessage)) {
+        return false;
+    }
+
+    QSet<int> seenChangeIds;
+    for (const QStringList& row : changes.rows) {
+        bool idValid = false;
+        const int changeId = row[0].toInt(&idValid);
+        if (!idValid || changeId <= 0 || seenChangeIds.contains(changeId)) {
+            if (errorMessage) {
+                *errorMessage = "La auditoría contiene un ID de cambio inválido o duplicado.";
+            }
+            roleUndoStack.clear();
+            return false;
+        }
+        seenChangeIds.insert(changeId);
+
+        if (row[5] == "CAMBIO") {
+            roleUndoStack.push(changeId);
+        } else if (row[5] == "DESHACER") {
+            bool referenceValid = false;
+            const int referenceId = row[6].toInt(&referenceValid);
+            if (!referenceValid || roleUndoStack.empty()
+                || roleUndoStack.top() != referenceId) {
+                if (errorMessage) {
+                    *errorMessage =
+                        "La auditoría no sigue el orden LIFO esperado para deshacer cambios.";
+                }
+                roleUndoStack.clear();
+                return false;
+            }
+            roleUndoStack.pop();
+        } else {
+            if (errorMessage) {
+                *errorMessage = "La auditoría contiene una acción de rol desconocida.";
+            }
+            roleUndoStack.clear();
+            return false;
+        }
+    }
+
+    roleUndoHistoryValid = true;
     return true;
 }
 
@@ -1411,42 +1491,32 @@ void MainWindow::undoLastRoleChange()
         return;
     }
 
-    QSet<int> undoneChanges;
-    for (const QStringList& row : changes.rows) {
-        if (row[5] != "DESHACER") continue;
-        bool referenceValid = false;
-        const int referenceId = row[6].toInt(&referenceValid);
-        if (!referenceValid) {
-            QMessageBox::warning(
-                this, "Auditoría inválida",
-                "La auditoría contiene una referencia de deshacer inválida.");
-            return;
-        }
-        undoneChanges.insert(referenceId);
+    if (!roleUndoHistoryValid) {
+        QMessageBox::warning(
+            this, "Auditoría de roles inválida",
+            "No se puede deshacer porque la pila de cambios no se reconstruyó correctamente.");
+        return;
+    }
+    if (roleUndoStack.empty()) {
+        QMessageBox::information(this, "Sin cambios pendientes",
+                                 "No hay cambios de rol que se puedan deshacer.");
+        return;
     }
 
+    const int targetChangeId = roleUndoStack.top();
     int targetRow = -1;
-    int targetChangeId = -1;
     for (int rowIndex = changes.rows.size() - 1; rowIndex >= 0; --rowIndex) {
-        const QStringList& row = changes.rows[rowIndex];
-        if (row[5] != "CAMBIO") continue;
         bool idValid = false;
-        const int changeId = row[0].toInt(&idValid);
-        if (!idValid) {
-            QMessageBox::warning(this, "Auditoría inválida",
-                                 "La auditoría contiene un ID de cambio inválido.");
-            return;
-        }
-        if (!undoneChanges.contains(changeId)) {
+        const int changeId = changes.rows[rowIndex][0].toInt(&idValid);
+        if (idValid && changeId == targetChangeId
+            && changes.rows[rowIndex][5] == "CAMBIO") {
             targetRow = rowIndex;
-            targetChangeId = changeId;
             break;
         }
     }
-
     if (targetRow < 0) {
-        QMessageBox::information(this, "Sin cambios pendientes",
-                                 "No hay cambios de rol que se puedan deshacer.");
+        QMessageBox::warning(this, "Auditoría inválida",
+                             "El último cambio de la pila no aparece en la auditoría.");
         return;
     }
 
@@ -1855,8 +1925,18 @@ void MainWindow::refreshSummaryReports()
     struct BadPerformerRow {
         QStringList values;
         int deaths = 0;
+        int sequence = 0;
     };
-    QVector<BadPerformerRow> badRows;
+    struct BadPerformerPriority {
+        bool operator()(const BadPerformerRow& left,
+                        const BadPerformerRow& right) const
+        {
+            if (left.deaths != right.deaths) return left.deaths > right.deaths;
+            return left.sequence < right.sequence;
+        }
+    };
+    PriorityQueue<BadPerformerRow, BadPerformerPriority> badRows;
+    int badPerformerSequence = 0;
     for (const QStringList& row : stats.rows) {
         if (row[11] != "Requiere Revision") continue;
         const auto matchIt = matchData.constFind(row[1]);
@@ -1868,33 +1948,41 @@ void MainWindow::refreshSummaryReports()
         QString riotId = QString::fromStdString((*userIt)->riotId);
         const QString tagline = QString::fromStdString((*userIt)->tagline);
         if (!tagline.isEmpty()) riotId += "#" + tagline;
-        badRows.append({
+        badRows.push({
             {riotId, championNames.value(row[3].toInt(), row[3]),
              row[4], row[5], row[6], row[11], row[1]},
-            row[5].toInt()
+            row[5].toInt(),
+            badPerformerSequence++
         });
     }
-    std::stable_sort(badRows.begin(), badRows.end(),
-                     [](const BadPerformerRow& left, const BadPerformerRow& right) {
-        return left.deaths > right.deaths;
-    });
     badPerformersTable->clear();
     badPerformersTable->setColumnCount(7);
     badPerformersTable->setHorizontalHeaderLabels(
         {"Riot ID", "Campeón", "K", "D", "A", "Estado", "Partida"});
     badPerformersTable->setRowCount(badRows.size());
-    for (int row = 0; row < badRows.size(); ++row) {
-        for (int column = 0; column < badRows[row].values.size(); ++column) {
+    for (int row = 0; !badRows.empty(); ++row) {
+        const BadPerformerRow entry = badRows.pop();
+        for (int column = 0; column < entry.values.size(); ++column) {
             badPerformersTable->setItem(
-                row, column, new QTableWidgetItem(badRows[row].values[column]));
+                row, column, new QTableWidgetItem(entry.values[column]));
         }
     }
 
     struct FreeAgentRow {
         QStringList values;
         double winrate = 0;
+        int sequence = 0;
     };
-    QVector<FreeAgentRow> freeRows;
+    struct FreeAgentPriority {
+        bool operator()(const FreeAgentRow& left,
+                        const FreeAgentRow& right) const
+        {
+            if (left.winrate != right.winrate) return left.winrate > right.winrate;
+            return left.sequence < right.sequence;
+        }
+    };
+    PriorityQueue<FreeAgentRow, FreeAgentPriority> freeRows;
+    int freeAgentSequence = 0;
     for (const Player& player : core.getPlayers()) {
         const QString playerId = QString::fromStdString(player.idNumber);
         if (activeContracts.contains(playerId)) continue;
@@ -1902,28 +1990,26 @@ void MainWindow::refreshSummaryReports()
         const double winrate = userIt == usersByPlayer.cend() ? 0.0 : (*userIt)->winrate;
         QString lastRole = QString::fromStdString(player.role);
         if (lastRole.isEmpty()) lastRole = "-";
-        freeRows.append({
+        freeRows.push({
             {playerId,
              QString("%1 %2").arg(QString::fromStdString(player.name),
                                    QString::fromStdString(player.lastName)),
              QString::fromStdString(player.country), lastRole,
              QString::number(winrate, 'f', 2) + "%"},
-            winrate
+            winrate,
+            freeAgentSequence++
         });
     }
-    std::stable_sort(freeRows.begin(), freeRows.end(),
-                     [](const FreeAgentRow& left, const FreeAgentRow& right) {
-        return left.winrate > right.winrate;
-    });
     freeAgentsTable->clear();
     freeAgentsTable->setColumnCount(5);
     freeAgentsTable->setHorizontalHeaderLabels(
         {"ID", "Nombre", "País", "Rol", "Winrate"});
     freeAgentsTable->setRowCount(freeRows.size());
-    for (int row = 0; row < freeRows.size(); ++row) {
-        for (int column = 0; column < freeRows[row].values.size(); ++column) {
+    for (int row = 0; !freeRows.empty(); ++row) {
+        const FreeAgentRow entry = freeRows.pop();
+        for (int column = 0; column < entry.values.size(); ++column) {
             freeAgentsTable->setItem(
-                row, column, new QTableWidgetItem(freeRows[row].values[column]));
+                row, column, new QTableWidgetItem(entry.values[column]));
         }
     }
 
@@ -1950,31 +2036,41 @@ void MainWindow::refreshSummaryReports()
     const QString recentPlayerId = recentAccountCombo->currentData().toString();
     const auto recentUserIt = usersByPlayer.constFind(recentPlayerId);
     if (recentUserIt == usersByPlayer.cend()) return;
-    QVector<QStringList> recentRows;
+    struct RecentMatchRow {
+        QStringList values;
+        qint64 creation = 0;
+        int sequence = 0;
+    };
+    QVector<RecentMatchRow> recentRows;
+    int recentMatchSequence = 0;
     for (const QStringList& row : stats.rows) {
         if (row[2].toInt() != (*recentUserIt)->userId) continue;
         const auto matchIt = matchData.constFind(row[1]);
         const QString creation = matchIt == matchData.cend() ? QString{} : (*matchIt)[3];
         recentRows.append({
-            row[7] == "1" ? "Victoria" : "Derrota",
-            row[1],
-            championNames.value(row[3].toInt(), row[3]),
-            row[4],
-            row[5],
-            row[6],
-            creation
+            {row[7] == "1" ? "Victoria" : "Derrota",
+             row[1],
+             championNames.value(row[3].toInt(), row[3]),
+             row[4],
+             row[5],
+             row[6]},
+            creation.toLongLong(),
+            recentMatchSequence++
         });
     }
     std::stable_sort(recentRows.begin(), recentRows.end(),
-                     [](const QStringList& left, const QStringList& right) {
-        return left[6].toLongLong() > right[6].toLongLong();
+                     [](const RecentMatchRow& left, const RecentMatchRow& right) {
+        if (left.creation != right.creation) return left.creation < right.creation;
+        return left.sequence > right.sequence;
     });
-    if (recentRows.size() > 5) recentRows.resize(5);
-    recentMatchesTable->setRowCount(recentRows.size());
-    for (int row = 0; row < recentRows.size(); ++row) {
-        for (int column = 0; column < 6; ++column) {
+    CircularQueue<RecentMatchRow> latestMatches(5);
+    for (const RecentMatchRow& match : recentRows) latestMatches.enqueue(match);
+    recentMatchesTable->setRowCount(latestMatches.size());
+    for (int row = 0; row < latestMatches.size(); ++row) {
+        const RecentMatchRow& match = latestMatches.at(latestMatches.size() - row - 1);
+        for (int column = 0; column < match.values.size(); ++column) {
             recentMatchesTable->setItem(
-                row, column, new QTableWidgetItem(recentRows[row][column]));
+                row, column, new QTableWidgetItem(match.values[column]));
         }
     }
 }
@@ -2695,7 +2791,7 @@ void MainWindow::downloadRiotStatistics()
 
     riotStatsQueue.clear();
     for (int index = 0; index < core.getLolUsers().size(); ++index) {
-        riotStatsQueue.append(index);
+        riotStatsQueue.enqueue(index);
     }
     riotStatsMatchLimit = matchLimit;
     riotStatsAccountTotal = riotStatsQueue.size();
@@ -2713,7 +2809,7 @@ void MainWindow::downloadRiotStatistics()
 
 void MainWindow::processNextRiotStatsAccount()
 {
-    if (riotStatsQueue.isEmpty()) {
+    if (riotStatsQueue.empty()) {
         const int failed = riotStatsAccountTotal - riotStatsAccountSuccesses;
         downloadingRiotStats = false;
         ui->updateLolAccountButton->setEnabled(true);
@@ -2748,7 +2844,7 @@ void MainWindow::processNextRiotStatsAccount()
         return;
     }
 
-    riotStatsAccountIndex = riotStatsQueue.takeFirst();
+    riotStatsAccountIndex = riotStatsQueue.dequeue();
     riotStatsCurrentErrors.clear();
     const LoLUser user = core.getLolUsers()[riotStatsAccountIndex];
     const QString riotId = QString::fromStdString(user.riotId).trimmed();
@@ -3154,7 +3250,7 @@ void MainWindow::finishRiotStatsAccount(int accountIndex, const QString& error)
     }
     riotStatsPuuid.clear();
     riotStatsMatchIds.clear();
-    if (riotStatsQueue.isEmpty()) {
+    if (riotStatsQueue.empty()) {
         processNextRiotStatsAccount();
         return;
     }
