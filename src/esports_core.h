@@ -42,6 +42,8 @@ public:
                       QString* errorMessage = nullptr);
     bool updateLolUser(int index, const LoLUser& user, const QString& filePath,
                        QString* errorMessage = nullptr);
+    bool addLolUser(const LoLUser& user, const QString& filePath,
+                    QString* errorMessage = nullptr);
     bool loadCsvTable(const QString& filePath, const QStringList& headers,
                       CsvTableData* table, QString* errorMessage = nullptr) const;
     bool saveCsvTable(const QString& filePath, const CsvTableData& table,

@@ -15,7 +15,10 @@
 #include <QFrame>
 #include <QFontMetrics>
 #include <QHeaderView>
+#include <QAction>
 #include <QLineEdit>
+#include <QLabel>
+#include <QMenu>
 #include <QMessageBox>
 #include <QHash>
 #include <QInputDialog>
@@ -37,6 +40,7 @@
 #include <QUrl>
 #include <QVBoxLayout>
 #include <algorithm>
+#include <limits>
 
 namespace {
 QString findCsvDirectory()
@@ -326,6 +330,15 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+    riotApiKey = qgetenv("RIOT_API_KEY").trimmed();
+    QMenu* riotMenu = menuBar()->addMenu("Riot API");
+    QAction* configureApiKeyAction =
+        riotMenu->addAction("Configurar o cambiar API key...");
+    QAction* clearApiKeyAction = riotMenu->addAction("Borrar API key de esta sesión");
+    connect(configureApiKeyAction, &QAction::triggered,
+            this, &MainWindow::configureRiotApiKey);
+    connect(clearApiKeyAction, &QAction::triggered,
+            this, &MainWindow::clearRiotApiKey);
     connect(ui->searchPlayerEdit, &QLineEdit::textChanged, this,
             [this](const QString& text) {
                 for (int row = 0; row < ui->tablePlayers->rowCount(); ++row){
@@ -350,6 +363,8 @@ MainWindow::MainWindow(QWidget *parent)
         {"ID cuenta", "ID jugador", "Riot ID", "Tagline", "PUUID", "Rango", "Winrate"});
     ui->tableLolUsers->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
     ui->tableLolUsers->verticalHeader()->setVisible(false);
+    connect(ui->addLolAccountButton, &QPushButton::clicked,
+            this, &MainWindow::addLolAccount);
     connect(ui->updateLolAccountButton, &QPushButton::clicked,
             this, &MainWindow::updateSelectedLolAccount);
     connect(ui->updateAllLolAccountsButton, &QPushButton::clicked,
@@ -419,14 +434,7 @@ void MainWindow::updateSelectedLolAccount()
         return;
     }
 
-    riotApiKey = qgetenv("RIOT_API_KEY").trimmed();
-    if (riotApiKey.isEmpty()) {
-        QMessageBox::warning(
-            this, "Falta la API key",
-            "Configura RIOT_API_KEY en el entorno de ejecución de Qt Creator. "
-            "No escribas la clave directamente en el código.");
-        return;
-    }
+    if (!ensureRiotApiKey()) return;
 
     lolAccountUpdateQueue = {index};
     lolAccountUpdateTotal = 1;
@@ -447,14 +455,7 @@ void MainWindow::updateAllLolAccounts()
         return;
     }
 
-    riotApiKey = qgetenv("RIOT_API_KEY").trimmed();
-    if (riotApiKey.isEmpty()) {
-        QMessageBox::warning(
-            this, "Falta la API key",
-            "Configura RIOT_API_KEY en el entorno de ejecución de Qt Creator. "
-            "No escribas la clave directamente en el código.");
-        return;
-    }
+    if (!ensureRiotApiKey()) return;
 
     if (QMessageBox::question(
             this, "Actualizar todas las cuentas",
@@ -478,6 +479,67 @@ void MainWindow::updateAllLolAccounts()
     processNextLolAccountUpdate();
 }
 
+void MainWindow::configureRiotApiKey()
+{
+    bool accepted = false;
+    const QString key = QInputDialog::getText(
+        this, "Configurar API key de Riot",
+        "Pega tu API key. Se mantendrá solo en memoria mientras el programa esté abierto:",
+        QLineEdit::Password, QString{}, &accepted).trimmed();
+    if (!accepted) return;
+    if (key.isEmpty()) {
+        QMessageBox::warning(this, "API key vacía",
+                             "No se cambió la API key porque el campo está vacío.");
+        return;
+    }
+
+    riotApiKey = key.toUtf8();
+    ui->statusbar->showMessage(
+        "API key de Riot actualizada para esta sesión.", 10000);
+}
+
+void MainWindow::clearRiotApiKey()
+{
+    if (riotApiKey.isEmpty()) {
+        QMessageBox::information(this, "Sin API key",
+                                 "No hay una API key configurada en esta sesión.");
+        return;
+    }
+
+    if (QMessageBox::question(
+            this, "Borrar API key",
+            "¿Borrar la API key de Riot de la memoria de esta sesión?",
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No)
+        != QMessageBox::Yes) {
+        return;
+    }
+
+    riotApiKey.fill('\0');
+    riotApiKey.clear();
+    ui->statusbar->showMessage(
+        "API key de Riot borrada de esta sesión.", 10000);
+}
+
+bool MainWindow::ensureRiotApiKey()
+{
+    if (!riotApiKey.isEmpty()) return true;
+
+    bool accepted = false;
+    const QString key = QInputDialog::getText(
+        this, "Falta la API key de Riot",
+        "Pega tu API key para continuar. Solo se conservará mientras el programa esté abierto:",
+        QLineEdit::Password, QString{}, &accepted).trimmed();
+    if (!accepted) return false;
+    if (key.isEmpty()) {
+        QMessageBox::warning(this, "API key vacía",
+                             "No se puede consultar Riot sin una API key.");
+        return false;
+    }
+
+    riotApiKey = key.toUtf8();
+    return true;
+}
+
 void MainWindow::processNextLolAccountUpdate()
 {
     if (lolAccountUpdateQueue.isEmpty()) {
@@ -485,7 +547,6 @@ void MainWindow::processNextLolAccountUpdate()
         ui->updateLolAccountButton->setEnabled(true);
         ui->updateAllLolAccountsButton->setEnabled(true);
         ui->tableLolUsers->setEnabled(true);
-        riotApiKey.clear();
 
         if (failed == 0) {
             ui->lolUsersStatusLabel->setText(
@@ -647,6 +708,93 @@ void MainWindow::refreshLolUsersTable()
         if (!emblem.isNull()) rankItem->setIcon(emblem);
         ui->tableLolUsers->setItem(row, 5, rankItem);
     }
+}
+
+void MainWindow::addLolAccount()
+{
+    if (core.getPlayers().isEmpty()) {
+        QMessageBox::information(
+            this, "No hay jugadores",
+            "Agrega primero un jugador antes de registrar su cuenta de Riot.");
+        return;
+    }
+
+    QDialog dialog(this);
+    dialog.setWindowTitle("Agregar cuenta de jugador");
+    auto* layout = new QVBoxLayout(&dialog);
+    auto* form = new QFormLayout;
+    auto* playerCombo = new QComboBox(&dialog);
+    for (const Player& player : core.getPlayers()) {
+        const QString playerId = QString::fromStdString(player.idNumber);
+        const QString playerName =
+            QString("%1 %2")
+                .arg(QString::fromStdString(player.name),
+                     QString::fromStdString(player.lastName))
+                .trimmed();
+        playerCombo->addItem(QString("%1 — %2").arg(playerName, playerId), playerId);
+    }
+
+    auto* riotId = new QLineEdit(&dialog);
+    riotId->setPlaceholderText("Nombre de invocador");
+    auto* tagline = new QLineEdit(&dialog);
+    tagline->setPlaceholderText("Ejemplo: LAN");
+    form->addRow("Jugador:", playerCombo);
+    form->addRow("Riot ID:", riotId);
+    form->addRow("Tagline:", tagline);
+    layout->addLayout(form);
+    layout->addWidget(new QLabel(
+        "Después de agregarla, selecciónala y pulsa «Actualizar cuenta seleccionada desde Riot» "
+        "para cargar su PUUID y rango.", &dialog));
+
+    auto* buttons = new QDialogButtonBox(
+        QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dialog);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    layout->addWidget(buttons);
+    if (dialog.exec() != QDialog::Accepted) return;
+
+    const QString riotIdValue = riotId->text().trimmed();
+    const QString taglineValue = tagline->text().trimmed();
+    if (riotIdValue.isEmpty() || taglineValue.isEmpty()) {
+        QMessageBox::warning(
+            this, "Datos incompletos",
+            "Escribe el Riot ID y el tagline para agregar la cuenta.");
+        return;
+    }
+
+    int nextUserId = 1;
+    for (const LoLUser& user : core.getLolUsers()) {
+        if (user.userId >= nextUserId) {
+            if (user.userId == std::numeric_limits<int>::max()) {
+                QMessageBox::warning(
+                    this, "No se pudo agregar la cuenta",
+                    "No quedan IDs disponibles para registrar otra cuenta.");
+                return;
+            }
+            nextUserId = user.userId + 1;
+        }
+    }
+
+    const LoLUser user{
+        nextUserId,
+        playerCombo->currentData().toString().toStdString(),
+        riotIdValue.toStdString(),
+        taglineValue.toStdString(),
+        {},
+        "Unranked",
+        0.0
+    };
+    QString error;
+    if (!core.addLolUser(user, lolUsersCsvPath, &error)) {
+        QMessageBox::warning(this, "No se pudo agregar la cuenta", error);
+        return;
+    }
+
+    refreshLolUsersTable();
+    refreshSummaryReports();
+    ui->tableLolUsers->selectRow(core.getLolUsers().size() - 1);
+    ui->lolUsersStatusLabel->setText(
+        "Cuenta agregada y guardada. Actualízala desde Riot para obtener su PUUID y rango.");
 }
 
 void MainWindow::addPlayer()
@@ -2529,31 +2677,20 @@ void MainWindow::downloadRiotStatistics()
         return;
     }
 
-    riotStatsApiKey = qgetenv("RIOT_API_KEY").trimmed();
-    if (riotStatsApiKey.isEmpty()) {
-        QMessageBox::warning(
-            this, "Falta la API key",
-            "Configura RIOT_API_KEY en el entorno de ejecución de Qt Creator. "
-            "No escribas la clave directamente en el código.");
-        return;
-    }
+    if (!ensureRiotApiKey()) return;
 
     bool accepted = false;
     const int matchLimit = QInputDialog::getInt(
         this, "Descargar estadísticas de Riot",
         "¿Cuántas partidas recientes por cuenta quieres consultar?",
         10, 1, 100, 1, &accepted);
-    if (!accepted) {
-        riotStatsApiKey.clear();
-        return;
-    }
+    if (!accepted) return;
     if (QMessageBox::question(
             this, "Confirmar descarga",
             QString("Se consultarán hasta %1 partidas de cada una de las %2 cuentas, "
                     "además de sus maestrías. Esto puede tardar varios minutos. ¿Continuar?")
                 .arg(matchLimit).arg(core.getLolUsers().size()),
             QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes) {
-        riotStatsApiKey.clear();
         return;
     }
 
@@ -2582,7 +2719,6 @@ void MainWindow::processNextRiotStatsAccount()
 {
     if (riotStatsQueue.isEmpty()) {
         const int failed = riotStatsAccountTotal - riotStatsAccountSuccesses;
-        riotStatsApiKey.clear();
         downloadingRiotStats = false;
         ui->updateLolAccountButton->setEnabled(true);
         ui->updateAllLolAccountsButton->setEnabled(true);
@@ -2636,7 +2772,7 @@ void MainWindow::processNextRiotStatsAccount()
         "https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/%1/%2")
                               .arg(encodedRiotId, encodedTagline));
     QNetworkRequest request(accountUrl);
-    request.setRawHeader("X-Riot-Token", riotStatsApiKey);
+    request.setRawHeader("X-Riot-Token", riotApiKey);
     const int accountIndex = riotStatsAccountIndex;
     QNetworkReply* reply = networkManager.get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply, accountIndex]() {
@@ -2685,7 +2821,7 @@ void MainWindow::fetchRiotMasteries(int accountIndex, const QString& puuid)
         "https://la1.api.riotgames.com/lol/champion-mastery/v4/"
         "champion-masteries/by-puuid/%1?count=10").arg(encodedPuuid));
     QNetworkRequest request(url);
-    request.setRawHeader("X-Riot-Token", riotStatsApiKey);
+    request.setRawHeader("X-Riot-Token", riotApiKey);
     QNetworkReply* reply = networkManager.get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply, accountIndex, puuid]() {
         const QByteArray body = reply->readAll();
@@ -2791,7 +2927,7 @@ void MainWindow::fetchRiotMatchIds(int accountIndex, const QString& puuid)
         "https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/%1/ids"
         "?start=0&count=%2").arg(encodedPuuid).arg(riotStatsMatchLimit));
     QNetworkRequest request(url);
-    request.setRawHeader("X-Riot-Token", riotStatsApiKey);
+    request.setRawHeader("X-Riot-Token", riotApiKey);
     QNetworkReply* reply = networkManager.get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply, accountIndex, puuid]() {
         const QByteArray body = reply->readAll();
@@ -2855,7 +2991,7 @@ void MainWindow::fetchNextRiotMatch(int accountIndex, const QString& puuid)
     const QUrl url(QStringLiteral(
         "https://americas.api.riotgames.com/lol/match/v5/matches/%1").arg(encodedMatchId));
     QNetworkRequest request(url);
-    request.setRawHeader("X-Riot-Token", riotStatsApiKey);
+    request.setRawHeader("X-Riot-Token", riotApiKey);
     QNetworkReply* reply = networkManager.get(request);
     connect(reply, &QNetworkReply::finished, this,
             [this, reply, accountIndex, puuid, matchId, userId]() {

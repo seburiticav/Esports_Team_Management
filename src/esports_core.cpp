@@ -4,6 +4,7 @@
 #include <QFileInfo>
 #include <QSaveFile>
 #include <QTextStream>
+#include <algorithm>
 
 namespace {
 bool parseCsvRow(const QString& line, QStringList& fields)
@@ -339,6 +340,53 @@ bool EsportsCore::updateLolUser(int index, const LoLUser& user, const QString& f
 
     QVector<LoLUser> updatedUsers = lolUsers;
     updatedUsers[index] = user;
+    if (!saveLolUsers(updatedUsers, filePath, errorMessage)) return false;
+    lolUsers = updatedUsers;
+    return true;
+}
+
+bool EsportsCore::addLolUser(const LoLUser& user, const QString& filePath,
+                             QString* errorMessage)
+{
+    const QString playerId = QString::fromStdString(user.playerIdNumber).trimmed();
+    const QString riotId = QString::fromStdString(user.riotId).trimmed();
+    const QString tagline = QString::fromStdString(user.tagline).trimmed();
+    if (user.userId <= 0 || playerId.isEmpty() || riotId.isEmpty() || tagline.isEmpty()) {
+        if (errorMessage) {
+            *errorMessage = QStringLiteral(
+                "El ID, jugador, Riot ID y tagline son obligatorios.");
+        }
+        return false;
+    }
+
+    const bool playerExists = std::any_of(
+        players.cbegin(), players.cend(),
+        [&playerId](const Player& player) {
+            return QString::fromStdString(player.idNumber).trimmed() == playerId;
+        });
+    if (!playerExists) {
+        if (errorMessage) *errorMessage = QStringLiteral("El jugador seleccionado no existe.");
+        return false;
+    }
+
+    for (const LoLUser& existingUser : lolUsers) {
+        if (existingUser.userId == user.userId) {
+            if (errorMessage) *errorMessage = QStringLiteral("Ya existe una cuenta con ese ID.");
+            return false;
+        }
+        if (QString::fromStdString(existingUser.riotId).compare(
+                riotId, Qt::CaseInsensitive) == 0
+            && QString::fromStdString(existingUser.tagline).compare(
+                tagline, Qt::CaseInsensitive) == 0) {
+            if (errorMessage) {
+                *errorMessage = QStringLiteral("Esa cuenta de Riot ya está registrada.");
+            }
+            return false;
+        }
+    }
+
+    QVector<LoLUser> updatedUsers = lolUsers;
+    updatedUsers.append(user);
     if (!saveLolUsers(updatedUsers, filePath, errorMessage)) return false;
     lolUsers = updatedUsers;
     return true;

@@ -115,6 +115,13 @@
          </widget>
         </item>
         <item>
+         <widget class="QPushButton" name="addLolAccountButton">
+          <property name="text">
+           <string>Agregar cuenta de jugador</string>
+          </property>
+         </widget>
+        </item>
+        <item>
          <widget class="QPushButton" name="updateLolAccountButton">
           <property name="text">
            <string>Actualizar cuenta seleccionada desde Riot</string>

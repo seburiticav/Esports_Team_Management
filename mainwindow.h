@@ -52,6 +52,10 @@ private:
                               QString* errorMessage);
     void updateSelectedLolAccount();
     void updateAllLolAccounts();
+    void configureRiotApiKey();
+    void clearRiotApiKey();
+    bool ensureRiotApiKey();
+    void addLolAccount();
     void processNextLolAccountUpdate();
     void finishLolAccountUpdate(int index, const QString& error = {});
     void refreshPlayersTable();
@@ -112,7 +116,6 @@ private:
     int championImageSkipped = 0;
     int championImageDownloaded = 0;
     QVector<int> riotStatsQueue;
-    QByteArray riotStatsApiKey;
     QString riotStatsPuuid;
     QStringList riotStatsMatchIds;
     QStringList riotStatsCurrentErrors;
