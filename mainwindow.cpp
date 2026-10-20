@@ -339,6 +339,9 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::configureRiotApiKey);
     connect(clearApiKeyAction, &QAction::triggered,
             this, &MainWindow::clearRiotApiKey);
+    downloadDataButton = ui->downloadDataButton;
+    connect(downloadDataButton, &QPushButton::clicked,
+            this, &MainWindow::downloadRiotStatistics);
     connect(ui->searchPlayerEdit, &QLineEdit::textChanged, this,
             [this](const QString& text) {
                 for (int row = 0; row < ui->tablePlayers->rowCount(); ++row){
@@ -1598,15 +1601,10 @@ void MainWindow::addCsvDataTabs()
         if (view.fileName == "state_stats.csv") {
             auto* downloadActions = new QHBoxLayout;
             downloadActions->setSpacing(6);
-            view.downloadStatisticsButton = new QPushButton(
-                "Descargar maestrías y estadísticas de Riot", page);
-            connect(view.downloadStatisticsButton, &QPushButton::clicked,
-                    this, &MainWindow::downloadRiotStatistics);
             view.downloadChampionImagesButton = new QPushButton(
                 "Descargar imágenes de campeones", page);
             connect(view.downloadChampionImagesButton, &QPushButton::clicked,
                     this, &MainWindow::downloadChampionImages);
-            downloadActions->addWidget(view.downloadStatisticsButton);
             downloadActions->addWidget(view.downloadChampionImagesButton);
             layout->addLayout(downloadActions);
             championImagesStatus = new QLabel(page);
@@ -2681,14 +2679,15 @@ void MainWindow::downloadRiotStatistics()
 
     bool accepted = false;
     const int matchLimit = QInputDialog::getInt(
-        this, "Descargar estadísticas de Riot",
-        "¿Cuántas partidas recientes por cuenta quieres consultar?",
+        this, "Descargar datos",
+        "¿Cuántas partidas recientes por cuenta quieres descargar?",
         10, 1, 100, 1, &accepted);
     if (!accepted) return;
     if (QMessageBox::question(
             this, "Confirmar descarga",
-            QString("Se consultarán hasta %1 partidas de cada una de las %2 cuentas, "
-                    "además de sus maestrías. Esto puede tardar varios minutos. ¿Continuar?")
+            QString("Se actualizarán las cuentas y se descargarán maestrías y hasta "
+                    "%1 partidas por cada una de las %2 cuentas. Esto puede tardar varios "
+                    "minutos. ¿Continuar?")
                 .arg(matchLimit).arg(core.getLolUsers().size()),
             QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes) {
         return;
@@ -2707,11 +2706,8 @@ void MainWindow::downloadRiotStatistics()
     ui->updateLolAccountButton->setEnabled(false);
     ui->updateAllLolAccountsButton->setEnabled(false);
     ui->tableLolUsers->setEnabled(false);
-    if (CsvTableView* statsView = findCsvTable("state_stats.csv")) {
-        if (statsView->downloadStatisticsButton) {
-            statsView->downloadStatisticsButton->setEnabled(false);
-        }
-    }
+    downloadDataButton->setEnabled(false);
+    ui->statusbar->showMessage("Descargando datos de Riot...");
     processNextRiotStatsAccount();
 }
 
@@ -2723,10 +2719,17 @@ void MainWindow::processNextRiotStatsAccount()
         ui->updateLolAccountButton->setEnabled(true);
         ui->updateAllLolAccountsButton->setEnabled(true);
         ui->tableLolUsers->setEnabled(true);
-        if (CsvTableView* statsView = findCsvTable("state_stats.csv")) {
-            if (statsView->downloadStatisticsButton) {
-                statsView->downloadStatisticsButton->setEnabled(true);
+        downloadDataButton->setEnabled(true);
+        refreshLolUsersTable();
+        for (const QString& fileName : {
+                 QStringLiteral("state_masteries.csv"),
+                 QStringLiteral("state_stats.csv")}) {
+            if (CsvTableView* view = findCsvTable(fileName)) {
+                refreshCsvTable(*view);
             }
+        }
+        refreshSummaryReports();
+        if (CsvTableView* statsView = findCsvTable("state_stats.csv")) {
             statsView->status->setText(
                 QString("%1 de %2 cuentas sincronizadas. Maestrías, partidas y estadísticas "
                         "se guardan en sus CSV. %3")
@@ -2735,6 +2738,13 @@ void MainWindow::processNextRiotStatsAccount()
                     .arg(failed == 0 ? QString()
                                      : QString("Fallos: %1").arg(riotStatsErrors.join("; "))));
         }
+        ui->statusbar->showMessage(
+            failed == 0
+                ? QString("Descarga de datos completada: %1 cuentas actualizadas.")
+                      .arg(riotStatsAccountSuccesses)
+                : QString("Descarga finalizada: %1 de %2 cuentas actualizadas.")
+                      .arg(riotStatsAccountSuccesses).arg(riotStatsAccountTotal),
+            15000);
         return;
     }
 
@@ -2754,6 +2764,9 @@ void MainWindow::processNextRiotStatsAccount()
     }
     statsView->status->setText(
         QString("Cuenta %1 de %2: %3#%4")
+            .arg(current).arg(riotStatsAccountTotal).arg(riotId, tagline));
+    ui->statusbar->showMessage(
+        QString("Descargando datos de Riot: cuenta %1 de %2 (%3#%4)...")
             .arg(current).arg(riotStatsAccountTotal).arg(riotId, tagline));
 
     if (riotId.isEmpty() || tagline.isEmpty()) {

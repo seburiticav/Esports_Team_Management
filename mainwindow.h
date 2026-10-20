@@ -35,7 +35,6 @@ private:
         QTableWidget* table = nullptr;
         QLabel* status = nullptr;
         QPushButton* downloadButton = nullptr;
-        QPushButton* downloadStatisticsButton = nullptr;
         QPushButton* downloadChampionImagesButton = nullptr;
         QPushButton* addRowButton = nullptr;
         QPushButton* editRowButton = nullptr;
@@ -92,6 +91,7 @@ private:
     QTableWidget* freeAgentsTable = nullptr;
     QTableWidget* recentMatchesTable = nullptr;
     QComboBox* recentAccountCombo = nullptr;
+    QPushButton* downloadDataButton = nullptr;
     QNetworkAccessManager networkManager;
     QVector<CsvTableView> csvTableViews;
     QVector<int> lolAccountUpdateQueue;
