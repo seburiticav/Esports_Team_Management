@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 520" width="1024" height="1024">
+  <defs>
+    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7CF5E0"/>
+      <stop offset="1" stop-color="#7C7FF5"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFE29A"/>
+      <stop offset="1" stop-color="#FF8A5B"/>
+    </linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14182B"/>
+      <stop offset="1" stop-color="#0A0C18"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="520" height="520" rx="110" fill="url(#bg)"/>
+
+  <!-- E y S: separadas, unidas solo por la barra central compartida -->
+  <g fill="none" stroke="url(#g1)" stroke-width="36" stroke-linejoin="miter" stroke-linecap="butt">
+    <!-- E -->
+    <path d="M250 142 H112 V378 H250"/>
+    <path d="M112 260 H205"/>
+    <!-- S -->
+    <path d="M408 142 H262 V260 H408 V378 H262"/>
+  </g>
+
+  <!-- M fina que las atraviesa, sin tapar las letras -->
+  <g fill="none" stroke-linejoin="miter" stroke-linecap="butt">
+    <path d="M85 440 V90 L260 300 L435 90 V440" stroke="#0A0C18" stroke-width="26"/>
+    <path d="M85 440 V90 L260 300 L435 90 V440" stroke="url(#g2)" stroke-width="10"/>
+  </g>
+</svg>
