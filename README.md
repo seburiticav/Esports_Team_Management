@@ -1,40 +1,103 @@
-# Esports_Team_Management
+# Esports Manager
 
-Proyecto final desarrollado para la asignatura de Estructura de Datos. Esta aplicación utiliza la API oficial de Riot Games para consultar, procesar y visualizar estadísticas de jugadores (Maestrias, KDAs, Rango y Winrate) vinculados a sus datos personales (ID, Nombre, Apellido, País y Fecha de Nacimiento).
+Aplicación de escritorio desarrollada en C++ y Qt para administrar jugadores
+de esports y sus cuentas de League of Legends. Los datos de la aplicación se
+guardan localmente en archivos CSV; la integración con Riot Games permite
+actualizar cuentas, rangos, maestrías y estadísticas de partidas.
 
-# Integrantes
- - Sebastian Buritica Velasco
- - Andres Felipe Otero Barrera
+## Integrantes
 
-# Estructura de datos utilizadas
-En el siguiente proyecto se implementaron tres estructuras de datos lineales para gestionar la información obtenida de la API y de la base de datos local:
+- Sebastian Buritica Velasco
+- Andres Felipe Otero Barrera
 
-1. *Arreglos Dinámicos (Vector / ArrayList / List)*:
-   * *Uso:* Almacenamiento general de la lista de jugadores y sus datos de cuenta registrados en el sistema (ID, Nombre, Apellido, País, Riot ID, Tagline, PUUID)[cite: 2, 3].
-2. *Cola con Prioridad (Priority Queue)*:
-   * *Uso:* Construcción del Leaderboard o ranking general. Ordena automáticamente a los jugadores con base en sus puntos de liga (LP) y su tasa de victorias (Winrate).
-3. *Pila (Stack) / Cola Circular (Circular Queue)*:
-   * *Uso:* Gestión del historial reciente de búsquedas y buffer de peticiones a la API para controlar el límite de tasa de solicitudes (rate-limiting).
+## Funcionalidades
 
-# Uso de Inteligencia Artificial
+- Consultar, agregar, editar y eliminar jugadores.
+- Registrar cuentas de Riot y asociarlas a jugadores.
+- Actualizar una o todas las cuentas desde Riot, incluyendo Riot ID, rango y
+  winrate.
+- Administrar equipos y contratos, y consultar jugadores registrados y agentes
+  libres.
+- Cambiar el rol de un jugador, actualizar el contrato activo y deshacer cambios
+  usando la auditoría.
+- Descargar maestrías, partidas recientes y estadísticas. La vista de maestrías
+  muestra hasta las cinco maestrías con más puntos por cuenta.
+- Consultar informes de rendimiento y las últimas cinco partidas.
+- Descargar imágenes de campeones y verlas desde las tablas.
 
-Cumpliendo con la normativa de la entrega:
+La clave de Riot se puede introducir desde el menú **Riot API**. Se mantiene
+solo en memoria durante esa sesión; también se puede proporcionar mediante la
+variable de entorno `RIOT_API_KEY`. No incluyas la clave en el código, README,
+CSV ni repositorio.
 
-* *Porcentaje de código generado por IA:* ~75%
-* *Herramientas empleadas:* Claude/GPT-6
-* *Uso específico:* 
+## Estructuras de datos
 
-# Tecnologías y Requisitos
+El proyecto implementa estructuras propias en `src/data_structures.h` y las
+usa en operaciones de la interfaz:
 
-* *Lenguaje:* [ C++]
-* *Librerías principales:* 
-* *Clave de API:* Se requiere una RIOT_API_KEY válida obtenida desde el portal de [Riot Developer Portal](https://developer.riotgames.com/).
+1. **Arreglo dinámico (`DynamicArray`)**: almacena elementos en memoria y sirve
+   como base de la pila y del heap de la cola de prioridad.
+2. **Pila (`Stack`)**: mantiene los IDs de cambios de rol pendientes de
+   deshacer. Al iniciar, se reconstruye leyendo
+   `CSVs/state_player_changes.csv`.
+3. **Cola FIFO (`Queue`)**: procesa en orden las cuentas pendientes de
+   sincronización con Riot.
+4. **Cola de prioridad (`PriorityQueue`)**: ordena el informe de jugadores con
+   bajo rendimiento por muertes y el de agentes libres por winrate. Conserva el
+   orden de entrada cuando hay empates.
+5. **Cola circular (`CircularQueue`)**: conserva las cinco partidas más
+   recientes que se muestran para la cuenta seleccionada.
 
+Las estructuras se usan para procesar y presentar datos; los archivos CSV
+siguen siendo el medio de persistencia. Sus pruebas se encuentran en
+`tests/data_structures_tests.cpp`.
 
-# Instalación y Ejecución
+## Tecnologías y requisitos
 
-1. *Clonar el repositorio:*
-   Ejecutar en elbash
-   git clone [https://github.com/seburiticav/Esports_Team_Management.git]
-   cd Esports_Team_Management
----
+- C++17.
+- Qt 6 con los módulos Widgets y Network.
+- CMake 3.16 o posterior.
+- Un compilador C++ compatible, por ejemplo MinGW o MSVC.
+- Una clave de Riot válida para las funciones que consultan la API.
+- Conexión a Internet para consultar Riot y descargar recursos de Data Dragon.
+
+## Instalación y ejecución
+
+### Usar el ejecutable portable de Windows
+
+Si tienes el paquete portable de Windows, extráelo completo en una carpeta y
+ejecuta `Proyecto_EDD.exe`. No muevas el ejecutable fuera de esa carpeta:
+necesita las bibliotecas de Qt, los CSV y los recursos incluidos.
+
+### Compilar desde el repositorio
+
+Clona la rama del proyecto y abre `CMakeLists.txt` en la raíz del repositorio en
+Qt Creator.
+Selecciona un kit de Qt 6 para escritorio, configura el proyecto y ejecútalo.
+
+También se puede compilar desde una terminal con CMake. Configura
+`CMAKE_PREFIX_PATH` con la carpeta de instalación de Qt:
+
+```powershell
+git clone --branch Sebastian-Buritica https://github.com/seburiticav/Esports_Team_Management.git
+cd Esports_Team_Management
+cmake -S . -B build -DCMAKE_PREFIX_PATH="<ruta-a-Qt>"
+cmake --build build --config Release
+```
+
+Para ejecutar las pruebas de estructuras:
+
+```powershell
+ctest --test-dir build --output-on-failure
+```
+
+## Archivos de datos
+
+Los CSV de la carpeta `CSVs/` contienen jugadores, cuentas, equipos, contratos,
+maestrías, partidas, estadísticas y auditoría de roles. La aplicación los lee y
+actualiza al utilizarse. Es recomendable hacer una copia de seguridad antes de modificarlos
+manualmente 
+
+## Uso de inteligencia artificial
+
+Uso aproximado de herramientas de IA: ~75%
