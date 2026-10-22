@@ -1,4 +1,5 @@
 # Esports Manager
+<img width="2048" height="2048" alt="app_icon" src="https://github.com/user-attachments/assets/4f972547-0607-40f1-b0c8-c27b0fa96059" />
 
 Aplicación de escritorio desarrollada en C++ y Qt para administrar jugadores
 de esports y sus cuentas de League of Legends. Los datos de la aplicación se
