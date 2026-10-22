@@ -1,23 +1,40 @@
-# Esports Manager
+# Esports_Team_Management
 
-Aplicación de escritorio en C++ y Qt para administrar jugadores, cuentas de
-League of Legends, equipos, contratos, estadísticas y reportes.
+Proyecto final desarrollado para la asignatura de Estructura de Datos. Esta aplicación utiliza la API oficial de Riot Games para consultar, procesar y visualizar estadísticas de jugadores (Riot ID, Tagline, PUUID, Rango y Winrate) vinculados a sus datos personales (ID, Nombre, Apellido, País y Fecha de Nacimiento).
 
-## Estructuras de datos
+# Integrantes
+ - Sebastian Buritica Velasco
+ - Andres Felipe Otero Barrera
 
-La interfaz utiliza implementaciones propias de `src/data_structures.h` en
-operaciones reales:
+# Estructura de datos utilizasa
+En el siguiente proyecto se implementaron tres estructuras de datos lineales para gestionar la información obtenida de la API y de la base de datos local:
 
-- `DynamicArray`: almacenamiento dinámico utilizado como base de la pila y del
-  heap de prioridad.
-- `Stack`: conserva los IDs de cambios de rol pendientes de deshacer. Se
-  reconstruye desde `CSVs/state_player_changes.csv` al iniciar.
-- `Queue`: procesa en orden FIFO las cuentas pendientes de sincronización con
-  Riot.
-- `PriorityQueue`: ordena los informes de bajo rendimiento y agentes libres,
-  conservando el orden original cuando hay empates.
-- `CircularQueue`: mantiene las cinco partidas más recientes que se muestran
-  para la cuenta seleccionada.
+1. *Arreglos Dinámicos (Vector / ArrayList / List)*:
+   * *Uso:* Almacenamiento general de la lista de jugadores y sus datos de cuenta registrados en el sistema (ID, Nombre, Apellido, País, Riot ID, Tagline, PUUID)[cite: 2, 3].
+2. *Cola con Prioridad (Priority Queue)*:
+   * *Uso:* Construcción del Leaderboard o ranking general. Ordena automáticamente a los jugadores con base en sus puntos de liga (LP) y su tasa de victorias (Winrate).
+3. *Pila (Stack) / Cola Circular (Circular Queue)*:
+   * *Uso:* Gestión del historial reciente de búsquedas y buffer de peticiones a la API para controlar el límite de tasa de solicitudes (rate-limiting).
 
-Las estructuras se implementan en C++ y no reemplazan los archivos CSV usados
-para persistir los datos.
+# Uso de Inteligencia Artificial
+
+Cumpliendo con la normativa de la entrega:
+
+* *Porcentaje de código generado por IA:* ~25%
+* *Herramientas empleadas:* Claude/Gemini
+* *Uso específico:* 
+
+# Tecnologías y Requisitos
+
+* *Lenguaje:* [ C++]
+* *Librerías principales:* 
+* *Clave de API:* Se requiere una RIOT_API_KEY válida obtenida desde el portal de [Riot Developer Portal](https://developer.riotgames.com/).
+
+
+# Instalación y Ejecución
+
+1. *Clonar el repositorio:*
+   Ejecutar en elbash
+   git clone [https://github.com/seburiticav/Esports_Team_Management.git]
+   cd Esports_Team_Management
+---
