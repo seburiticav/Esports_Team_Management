@@ -1,12 +1,12 @@
 # Esports_Team_Management
 
-Proyecto final desarrollado para la asignatura de Estructura de Datos. Esta aplicación utiliza la API oficial de Riot Games para consultar, procesar y visualizar estadísticas de jugadores (Riot ID, Tagline, PUUID, Rango y Winrate) vinculados a sus datos personales (ID, Nombre, Apellido, País y Fecha de Nacimiento).
+Proyecto final desarrollado para la asignatura de Estructura de Datos. Esta aplicación utiliza la API oficial de Riot Games para consultar, procesar y visualizar estadísticas de jugadores (Maestrias, KDAs, Rango y Winrate) vinculados a sus datos personales (ID, Nombre, Apellido, País y Fecha de Nacimiento).
 
 # Integrantes
  - Sebastian Buritica Velasco
  - Andres Felipe Otero Barrera
 
-# Estructura de datos utilizasa
+# Estructura de datos utilizadas
 En el siguiente proyecto se implementaron tres estructuras de datos lineales para gestionar la información obtenida de la API y de la base de datos local:
 
 1. *Arreglos Dinámicos (Vector / ArrayList / List)*:
@@ -20,8 +20,8 @@ En el siguiente proyecto se implementaron tres estructuras de datos lineales par
 
 Cumpliendo con la normativa de la entrega:
 
-* *Porcentaje de código generado por IA:* ~25%
-* *Herramientas empleadas:* Claude/Gemini
+* *Porcentaje de código generado por IA:* ~75%
+* *Herramientas empleadas:* Claude/GPT-6
 * *Uso específico:* 
 
 # Tecnologías y Requisitos
