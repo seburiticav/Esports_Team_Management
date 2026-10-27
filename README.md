@@ -65,13 +65,13 @@ circular. Se considera que copiar un elemento y comparar prioridades cuestan
 | Estructura | Operación | Tiempo | Espacio |
 |---|---|---:|---:|
 | `DynamicArray` | Acceso por índice | `O(1)` | — |
-| `DynamicArray` | `pushBack` | `O(1)` amortizado; `O(n)` cuando crece | `O(n)` |
+| `DynamicArray` | `pushBack` | `O(1)` | `O(n)` |
 | `DynamicArray` | `removeAt` | `O(n)`; quitar el último cuesta `O(1)` | — |
-| `Stack` | `top`, `push` y `pop` | `O(1)` amortizado para `push`; `O(1)` para `top` y `pop` | `O(n)` |
+| `Stack` | `top`, `push` y `pop` | `O(1)` | `O(n)` |
 | `Queue` enlazada | `front`, `enqueue` y `dequeue` | `O(1)` | `O(n)` |
 | `Queue` enlazada | `clear` | `O(n)` | — |
 | `CircularQueue` | `enqueue`, `at` y consultas de tamaño | `O(1)` | `O(k)` |
-| `PriorityQueue` (heap binario) | `push` | `O(log n)` amortizado; `O(n)` si crece el arreglo | `O(n)` |
+| `PriorityQueue` (heap binario) | `push` | `O(log n)`| `O(n)` |
 | `PriorityQueue` (heap binario) | `pop` | `O(log n)` | — |
 
 En los informes, insertar los `n` registros en una cola de prioridad y
