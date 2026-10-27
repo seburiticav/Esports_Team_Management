@@ -122,5 +122,4 @@ publiques datos personales o de cuentas sin autorización.
 
 ## Uso de inteligencia artificial
 
-El equipo debe declarar las herramientas utilizadas y estimar el porcentaje de
-código generado o modificado con IA de acuerdo con el historial real de trabajo.
+75%~
